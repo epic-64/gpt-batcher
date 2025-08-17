@@ -5,6 +5,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+from typing import assert_never
 
 import matplotlib.pyplot as plt
 import streamlit as st
@@ -80,6 +81,21 @@ def plot_word_counts(word_freqs):
     ax.set_xticklabels(words, rotation=45, ha="right")
     st.pyplot(fig)
 
+def normalize_response(text: str) -> str:
+    # lowercase
+    text = text.lower()
+    # remove special characters (keep letters/numbers/spaces)
+    text = re.sub(r"[^a-z0-9\s]", "", text)
+    # collapse extra spaces
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def response_counts(results, top_n: int = 20):
+    normalized = [normalize_response(r) for r in results]
+    counts = Counter(normalized)
+    return counts.most_common(top_n)
+
 
 # -------- Streamlit UI --------
 st.title("GPT Batch Generator + Visualizer")
@@ -148,8 +164,21 @@ else:
         # Full prompt (can get long, so keep it on its own line)
         st.markdown(f"**Prompt:** {prompt_text}")
 
+        grouping_mode = st.radio(
+            "Group results by:",
+            ["Words", "Responses"],
+            horizontal=True
+        )
+
+        def get_frequencies():
+            match grouping_mode:
+                case "Words": return word_counts(results, top_n)
+                case "Responses": return response_counts(results, top_n)
+                case _: assert_never(grouping_mode)
+
+        frequencies = get_frequencies()
+
         # ---- Word frequency chart ----
-        frequencies = word_counts(results, top_n)
         plot_word_counts(frequencies)
 
         # ---- All responses ----
