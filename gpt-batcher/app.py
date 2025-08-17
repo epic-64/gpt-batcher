@@ -142,10 +142,17 @@ else:
     run_date = data.get("date", None)
     batch_size = data.get("batch_size", None)
 
-    all_words = []
-    for r in results:
-        all_words.extend(tokenize(r))
-    unique_words = len(set(all_words))
+    # compute group count depending on grouping mode
+    if grouping_mode == "Words":
+        all_words = []
+        for r in results:
+            all_words.extend(tokenize(r))
+        group_count = len(set(all_words))
+    elif grouping_mode == "Responses":
+        normalized = [normalize_response(r) for r in results]
+        group_count = len(set(normalized))
+    else:
+        group_count = 0
 
     separator = "&nbsp;&nbsp; | &nbsp;&nbsp;"
     st.subheader("Batch Info")
@@ -153,8 +160,8 @@ else:
     st.markdown(
         f"**Model:** `{model_used}` {separator} "
         f"**Batch Size:** {batch_size} {separator} "
-        f"**Top N:** {top_n} {separator} "
-        f"**Unique Words:** {unique_words}"
+        f"**Display Top:** {top_n} {separator} "
+        f"**Groups:** {group_count}"
     )
     st.markdown(f"**Prompt:** {prompt_text}")
 
