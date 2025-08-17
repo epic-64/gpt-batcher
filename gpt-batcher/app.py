@@ -13,16 +13,19 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 # Load environment variables
-load_dotenv()
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# load_dotenv()
+st.sidebar.header("API Settings")
+api_key = st.sidebar.text_input("OpenAI API Key", type="password") # or os.getenv("OPENAI_API_KEY")
+
+client = AsyncOpenAI(api_key=api_key)
 
 OUTPUTS_DIR = Path("outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
 
 # -------- Core helpers --------
-def sha256(s: str) -> str:
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+def hashit(s: str) -> str:
+    return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
 
 async def run_once(prompt: str, model: str) -> str:
@@ -40,7 +43,7 @@ async def generate(prompt: str, model: str, times: int):
     out = {"prompt": prompt, "model": model, "results": results}
 
     current_date = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = sha256(prompt + model)
+    file_name = hashit(prompt + model)
     file_path = OUTPUTS_DIR.joinpath(f"{current_date}-{file_name}.json")
     file_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     return file_path
@@ -97,7 +100,23 @@ files = sorted(OUTPUTS_DIR.glob("*.json"))
 if not files:
     st.write("No files in outputs/ yet.")
 else:
-    selected_file = st.selectbox("Choose file", files)
+    # Build display labels with prompt+model
+    file_labels = []
+    for f in files:
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            prompt = (data.get("prompt") or "").replace("\n", " ")
+            prompt_preview = prompt[:100] + ("…" if len(prompt) > 100 else "")
+            model = data.get("model", "?")
+            label = f"{f.name} | {model} | {prompt_preview}"
+        except Exception as e:
+            label = f"{f.name} | <error reading>"
+        file_labels.append(label)
+
+    # Use index mapping so dropdown returns the actual Path
+    idx = st.selectbox("Choose file", range(len(files)), format_func=lambda i: file_labels[i])
+    selected_file = files[idx]
+
     top_n = st.slider("Top N words", 5, 50, 20)
     if st.button("Visualize"):
         results = load_results(selected_file)
