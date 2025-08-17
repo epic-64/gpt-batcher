@@ -109,20 +109,22 @@ files = sorted(OUTPUTS_DIR.glob("*.json"), reverse=True)
 if not files:
     st.write("No files in outputs/ yet.")
 else:
-    # Build display labels with prompt+model
     file_labels = []
     for f in files:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            prompt_text = (data.get("prompt") or "").replace("\n", " ")
-            prompt_preview = prompt_text[:100] + ("…" if len(prompt_text) > 100 else "")
+            run_date = data.get("date", "?")
             model = data.get("model", "?")
-            label = f"{f.name} | {model} | {prompt_preview}"
+            batch_size = data.get("batch_size", "?")
+            prompt_text = (data.get("prompt") or "").replace("\n", " ")
+            prompt_preview = prompt_text[:60] + ("…" if len(prompt_text) > 60 else "")
+
+            # compact, readable one-liner
+            label = f"{model} · {batch_size} · {prompt_preview}"
         except Exception:
             label = f"{f.name} | <error reading>"
         file_labels.append(label)
 
-    # Dropdown shows friendly label, returns file index
     idx = st.selectbox("Choose file", range(len(files)), format_func=lambda i: file_labels[i])
     selected_file = files[idx]
 
@@ -170,6 +172,5 @@ else:
         st.write("No responses in this file.")
     else:
         st.table({
-            "Response #": list(range(1, len(results) + 1)),
             "Content": results,
         })
