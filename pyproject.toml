@@ -7,4 +7,5 @@ dependencies = [
     "matplotlib>=3.10.5",
     "openai>=1.99.9",
     "python-dotenv>=1.1.1",
+    "streamlit>=1.48.1",
 ]
