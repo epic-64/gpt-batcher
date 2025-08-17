@@ -25,11 +25,18 @@ def hashit(s: str) -> str:
 
 
 async def run_once(prompt: str, model: str) -> str:
-    resp = await client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
     )
-    return resp.choices[0].message.content
+
+    if (choices := response.choices) is None or len(choices) == 0:
+        raise ValueError("No choices returned from OpenAI API")
+
+    if (content := choices[0].message.content) is None:
+        raise ValueError("No content in the first choice message")
+
+    return content
 
 
 async def generate(prompt: str, model: str, times: int):
