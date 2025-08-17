@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import json
-import os
 import re
 from collections import Counter
 from datetime import datetime
@@ -9,13 +8,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import streamlit as st
-from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-# Load environment variables
-# load_dotenv()
 st.sidebar.header("API Settings")
-api_key = st.sidebar.text_input("OpenAI API Key", type="password") # or os.getenv("OPENAI_API_KEY")
+api_key = st.sidebar.text_input("OpenAI API Key", type="password")
 
 client = AsyncOpenAI(api_key=api_key)
 
@@ -122,8 +118,8 @@ else:
         results = load_results(selected_file)
 
         # Word frequency chart
-        freqs = word_counts(results, top_n)
-        plot_word_counts(freqs)
+        frequencies = word_counts(results, top_n)
+        plot_word_counts(frequencies)
 
         # Separator
         st.subheader("All Responses")
