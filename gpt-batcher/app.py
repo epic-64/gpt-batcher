@@ -134,7 +134,7 @@ else:
 
     # ---- Controls ----
     top_n = st.slider("Top N", 5, 50, 20)
-    grouping_mode = st.radio("Group results by:", ["Words", "Responses"], horizontal=True)
+    grouping_mode = st.radio("Group results by:", ["Responses", "Words"], horizontal=True)
 
     # ---- Metadata ----
     prompt_text = data.get("prompt", None)
