@@ -109,16 +109,26 @@ else:
             prompt_preview = prompt[:100] + ("…" if len(prompt) > 100 else "")
             model = data.get("model", "?")
             label = f"{f.name} | {model} | {prompt_preview}"
-        except Exception as e:
+        except Exception:
             label = f"{f.name} | <error reading>"
         file_labels.append(label)
 
-    # Use index mapping so dropdown returns the actual Path
+    # Dropdown shows friendly label, returns file index
     idx = st.selectbox("Choose file", range(len(files)), format_func=lambda i: file_labels[i])
     selected_file = files[idx]
 
     top_n = st.slider("Top N words", 5, 50, 20)
     if st.button("Visualize"):
         results = load_results(selected_file)
+
+        # Word frequency chart
         freqs = word_counts(results, top_n)
         plot_word_counts(freqs)
+
+        # Separator
+        st.subheader("All Responses")
+        if not results:
+            st.write("No responses in this file.")
+        else:
+            # Display responses in a nice table, one per row
+            st.table({"Response #": list(range(1, len(results) + 1)), "Content": results})
