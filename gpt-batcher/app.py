@@ -35,7 +35,7 @@ async def run_once(prompt: str, model: str) -> str:
 async def generate(prompt: str, model: str, times: int):
     tasks = [run_once(prompt, model) for _ in range(times)]
     results = await asyncio.gather(*tasks)
-    current_date = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
+    current_date = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
     out = {"date": current_date, "prompt": prompt, "model": model, "batch_size": times, "results": results}
     file_name = hashit(prompt + model)
     file_path = OUTPUTS_DIR.joinpath(f"{current_date}-{file_name}.json")
@@ -80,7 +80,7 @@ st.title("GPT Batch Generator + Visualizer")
 st.header("Generate new batch")
 with st.form("generate_form"):
     prompt = st.text_area("Prompt", "Say hi like a pirate")
-    model = st.selectbox("Model", ["gpt-4o-mini", "gpt-4.1", "gpt-3.5-turbo"])
+    model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
     times = st.number_input("Times", min_value=1, max_value=50, value=5)
     submitted = st.form_submit_button("Run batch")
     if submitted:
@@ -90,7 +90,7 @@ with st.form("generate_form"):
 
 
 st.header("Visualize existing batch")
-files = sorted(OUTPUTS_DIR.glob("*.json"))
+files = sorted(OUTPUTS_DIR.glob("*.json"), reverse=True)
 if not files:
     st.write("No files in outputs/ yet.")
 else:
@@ -123,10 +123,17 @@ else:
         batch_size = data.get("batch_size", 1)
 
         st.subheader("Batch Info")
-        st.markdown(f"**Date:** {run_date}")
+
+        # Collapse date, model, and batch size into one line
+        st.markdown(
+            f"**Model:** `{model_used}` &nbsp;&nbsp; | &nbsp;&nbsp; "
+            f"**Date:** {run_date} &nbsp;&nbsp; | &nbsp;&nbsp; "
+            f"**Batch Size:** {batch_size} | &nbsp;&nbsp; "
+            f"**Top N:** {top_n}"
+        )
+
+        # Full prompt (can get long, so keep it on its own line)
         st.markdown(f"**Prompt:** {prompt_text}")
-        st.markdown(f"**Model:** `{model_used}`")
-        st.markdown(f"**Batch Size:** {batch_size}")
 
         # ---- Word frequency chart ----
         frequencies = word_counts(results, top_n)
