@@ -47,7 +47,7 @@ async def main():
     outputs_dir = Path("outputs")
     outputs_dir.mkdir(exist_ok=True)
     current_date = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
-    file_name = sha256(args.prompt + args.model)
+    file_name = hashlib.sha1(args.prompt + args.model)
     file_path = outputs_dir.joinpath(f"{current_date}-{file_name}.json")
     Path(file_path).write_text(
         json.dumps(out, indent=2, ensure_ascii=False),
