@@ -35,10 +35,8 @@ async def run_once(prompt: str, model: str) -> str:
 async def generate(prompt: str, model: str, times: int):
     tasks = [run_once(prompt, model) for _ in range(times)]
     results = await asyncio.gather(*tasks)
-
-    out = {"prompt": prompt, "model": model, "results": results}
-
     current_date = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
+    out = {"date": current_date, "prompt": prompt, "model": model, "batch_size": times, "results": results}
     file_name = hashit(prompt + model)
     file_path = OUTPUTS_DIR.joinpath(f"{current_date}-{file_name}.json")
     file_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -115,16 +113,31 @@ else:
 
     top_n = st.slider("Top N words", 5, 50, 20)
     if st.button("Visualize"):
-        results = load_results(selected_file)
+        data = json.loads(selected_file.read_text(encoding="utf-8"))
+        results = data.get("results", [])
 
-        # Word frequency chart
+        # ---- Metadata ----
+        prompt_text = data.get("prompt", "")
+        model_used = data.get("model", "?")
+        run_date = data.get("date", "unknown")
+        batch_size = data.get("batch_size", 1)
+
+        st.subheader("Batch Info")
+        st.markdown(f"**Date:** {run_date}")
+        st.markdown(f"**Prompt:** {prompt_text}")
+        st.markdown(f"**Model:** `{model_used}`")
+        st.markdown(f"**Batch Size:** {batch_size}")
+
+        # ---- Word frequency chart ----
         frequencies = word_counts(results, top_n)
         plot_word_counts(frequencies)
 
-        # Separator
+        # ---- All responses ----
         st.subheader("All Responses")
         if not results:
             st.write("No responses in this file.")
         else:
-            # Display responses in a nice table, one per row
-            st.table({"Response #": list(range(1, len(results) + 1)), "Content": results})
+            st.table({
+                "Response #": list(range(1, len(results) + 1)),
+                "Content": results,
+            })
