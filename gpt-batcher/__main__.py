@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -45,13 +46,15 @@ async def main():
 
     outputs_dir = Path("outputs")
     outputs_dir.mkdir(exist_ok=True)
-    filename = outputs_dir.joinpath(f"{sha256(args.prompt + args.model)}.json")
-    Path(filename).write_text(
+    current_date = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
+    file_name = sha256(args.prompt + args.model)
+    file_path = outputs_dir.joinpath(f"{current_date}-{file_name}.json")
+    Path(file_path).write_text(
         json.dumps(out, indent=2, ensure_ascii=False),
         encoding="utf-8"
     )
 
-    print(f"Wrote {len(results)} results to {filename}")
+    print(f"Wrote {len(results)} results to {file_path}")
 
 
 if __name__ == "__main__":
