@@ -81,7 +81,7 @@ st.header("Generate new batch")
 with st.form("generate_form"):
     prompt = st.text_area("Prompt", "Say hi like a pirate")
     model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
-    times = st.number_input("Times", min_value=1, max_value=50, value=50)
+    times = st.number_input("Times", min_value=1, max_value=100, value=50)
     submitted = st.form_submit_button("Run batch")
     if submitted:
         with st.spinner("Generating..."):
