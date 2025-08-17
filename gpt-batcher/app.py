@@ -5,7 +5,6 @@ import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import assert_never
 
 import matplotlib.pyplot as plt
 import streamlit as st
@@ -51,11 +50,6 @@ async def generate(prompt: str, model: str, times: int):
     return file_path
 
 
-def load_results(path: Path):
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data.get("results", [])
-
-
 def tokenize(text: str):
     return re.findall(r"\b\w+\b", text.lower())
 
@@ -68,25 +62,9 @@ def word_counts(results, top_n: int = 20):
     return counts.most_common(top_n)
 
 
-def plot_word_counts(word_freqs):
-    if not word_freqs:
-        st.write("No words found")
-        return
-    words, freqs = zip(*word_freqs)
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(words, freqs)
-    ax.set_title("Top Words")
-    ax.set_ylabel("Frequency")
-    ax.set_xticks(range(len(words)))
-    ax.set_xticklabels(words, rotation=45, ha="right")
-    st.pyplot(fig)
-
 def normalize_response(text: str) -> str:
-    # lowercase
     text = text.lower()
-    # remove special characters (keep letters/numbers/spaces)
     text = re.sub(r"[^a-z0-9\s]", "", text)
-    # collapse extra spaces
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -97,12 +75,26 @@ def response_counts(results, top_n: int = 20):
     return counts.most_common(top_n)
 
 
+def plot_word_counts(word_freqs):
+    if not word_freqs:
+        st.write("No items found")
+        return
+    words, freqs = zip(*word_freqs)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(words, freqs)
+    ax.set_title("Top Frequencies")
+    ax.set_ylabel("Frequency")
+    ax.set_xticks(range(len(words)))
+    ax.set_xticklabels(words, rotation=45, ha="right")
+    st.pyplot(fig)
+
+
 # -------- Streamlit UI --------
 st.title("GPT Batch Generator + Visualizer")
 
 st.header("Generate new batch")
 with st.form("generate_form"):
-    prompt = st.text_area("Prompt", "Give me any book title (respond with just the name")
+    prompt = st.text_area("Prompt", "Give me any book title (respond with just the name)")
     model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
     times = st.number_input("Times", min_value=1, max_value=100, value=50)
     submitted = st.form_submit_button("Run batch")
@@ -122,8 +114,8 @@ else:
     for f in files:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            prompt = (data.get("prompt") or "").replace("\n", " ")
-            prompt_preview = prompt[:100] + ("…" if len(prompt) > 100 else "")
+            prompt_text = (data.get("prompt") or "").replace("\n", " ")
+            prompt_preview = prompt_text[:100] + ("…" if len(prompt_text) > 100 else "")
             model = data.get("model", "?")
             label = f"{f.name} | {model} | {prompt_preview}"
         except Exception:
@@ -134,59 +126,50 @@ else:
     idx = st.selectbox("Choose file", range(len(files)), format_func=lambda i: file_labels[i])
     selected_file = files[idx]
 
-    top_n = st.slider("Top N words", 5, 50, 50)
-    if st.button("Visualize"):
-        data = json.loads(selected_file.read_text(encoding="utf-8"))
-        results = data.get("results", [])
+    # Load data for visualization
+    data = json.loads(selected_file.read_text(encoding="utf-8"))
+    results = data.get("results", [])
 
-        # ---- Metadata ----
-        prompt_text = data.get("prompt", None)
-        model_used = data.get("model", None)
-        run_date = data.get("date", None)
-        batch_size = data.get("batch_size", None)
+    # ---- Controls ----
+    top_n = st.slider("Top N", 5, 50, 20)
+    grouping_mode = st.radio("Group results by:", ["Words", "Responses"], horizontal=True)
 
-        # Unique word count across all responses
-        all_words = []
-        for r in results:
-            all_words.extend(tokenize(r))
-        unique_words = len(set(all_words))
+    # ---- Metadata ----
+    prompt_text = data.get("prompt", None)
+    model_used = data.get("model", None)
+    run_date = data.get("date", None)
+    batch_size = data.get("batch_size", None)
 
-        separator = "&nbsp;&nbsp; | &nbsp;&nbsp;"
-        st.subheader("Batch Info")
-        st.markdown(f"**Date:** {run_date} ")
-        st.markdown(
-            f"**Model:** `{model_used}` {separator} "
-            f"**Batch Size:** {batch_size} {separator} "
-            f"**Top N:** {top_n} {separator} "
-            f"**Unique Words:** {unique_words}"
-        )
+    all_words = []
+    for r in results:
+        all_words.extend(tokenize(r))
+    unique_words = len(set(all_words))
 
-        # Full prompt (can get long, so keep it on its own line)
-        st.markdown(f"**Prompt:** {prompt_text}")
+    separator = "&nbsp;&nbsp; | &nbsp;&nbsp;"
+    st.subheader("Batch Info")
+    st.markdown(f"**Date:** {run_date} ")
+    st.markdown(
+        f"**Model:** `{model_used}` {separator} "
+        f"**Batch Size:** {batch_size} {separator} "
+        f"**Top N:** {top_n} {separator} "
+        f"**Unique Words:** {unique_words}"
+    )
+    st.markdown(f"**Prompt:** {prompt_text}")
 
-        grouping_mode = st.radio(
-            "Group results by:",
-            ["Words", "Responses"],
-            horizontal=True
-        )
+    # ---- Frequencies ----
+    match grouping_mode:
+        case "Words": frequencies = word_counts(results, top_n)
+        case "Responses": frequencies = response_counts(results, top_n)
+        case _: frequencies = []
 
-        def get_frequencies():
-            match grouping_mode:
-                case "Words": return word_counts(results, top_n)
-                case "Responses": return response_counts(results, top_n)
-                case _: assert_never(grouping_mode)
+    plot_word_counts(frequencies)
 
-        frequencies = get_frequencies()
-
-        # ---- Word frequency chart ----
-        plot_word_counts(frequencies)
-
-        # ---- All responses ----
-        st.subheader("All Responses")
-        if not results:
-            st.write("No responses in this file.")
-        else:
-            st.table({
-                "Response #": list(range(1, len(results) + 1)),
-                "Content": results,
-            })
+    # ---- All responses ----
+    st.subheader("All Responses")
+    if not results:
+        st.write("No responses in this file.")
+    else:
+        st.table({
+            "Response #": list(range(1, len(results) + 1)),
+            "Content": results,
+        })
