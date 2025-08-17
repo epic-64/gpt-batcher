@@ -117,19 +117,25 @@ else:
         results = data.get("results", [])
 
         # ---- Metadata ----
-        prompt_text = data.get("prompt", "")
-        model_used = data.get("model", "?")
-        run_date = data.get("date", "unknown")
-        batch_size = data.get("batch_size", 1)
+        prompt_text = data.get("prompt", None)
+        model_used = data.get("model", None)
+        run_date = data.get("date", None)
+        batch_size = data.get("batch_size", None)
 
+        # Unique word count across all responses
+        all_words = []
+        for r in results:
+            all_words.extend(tokenize(r))
+        unique_words = len(set(all_words))
+
+        separator = "&nbsp;&nbsp; | &nbsp;&nbsp;"
         st.subheader("Batch Info")
-
-        # Collapse date, model, and batch size into one line
+        st.markdown(f"**Date:** {run_date} ")
         st.markdown(
-            f"**Model:** `{model_used}` &nbsp;&nbsp; | &nbsp;&nbsp; "
-            f"**Date:** {run_date} &nbsp;&nbsp; | &nbsp;&nbsp; "
-            f"**Batch Size:** {batch_size} | &nbsp;&nbsp; "
-            f"**Top N:** {top_n}"
+            f"**Model:** `{model_used}` {separator} "
+            f"**Batch Size:** {batch_size} {separator} "
+            f"**Top N:** {top_n} {separator} "
+            f"**Unique Words:** {unique_words}"
         )
 
         # Full prompt (can get long, so keep it on its own line)
