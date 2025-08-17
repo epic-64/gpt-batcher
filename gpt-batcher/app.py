@@ -133,7 +133,7 @@ else:
     results = data.get("results", [])
 
     # ---- Controls ----
-    top_n = st.slider("Top N", 5, 50, 20)
+    top_n = st.slider("Display Top", 5, 50, 50)
     grouping_mode = st.radio("Group results by:", ["Responses", "Words"], horizontal=True)
 
     # ---- Metadata ----
