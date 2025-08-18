@@ -24,10 +24,11 @@ def hashit(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
 
-async def run_once(prompt: str, model: str) -> str:
+async def run_once(prompt: str, model: str, temperature: float) -> str:
     response = await client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
     )
 
     if (choices := response.choices) is None or len(choices) == 0:
@@ -39,12 +40,19 @@ async def run_once(prompt: str, model: str) -> str:
     return content
 
 
-async def generate(prompt: str, model: str, times: int):
-    tasks = [run_once(prompt, model) for _ in range(times)]
+async def generate(prompt: str, model: str, times: int, temperature: float):
+    tasks = [run_once(prompt, model, temperature) for _ in range(times)]
     results = await asyncio.gather(*tasks)
     current_date = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
-    out = {"date": current_date, "prompt": prompt, "model": model, "batch_size": times, "results": results}
-    file_name = hashit(prompt + model)
+    out = {
+        "date": current_date,
+        "prompt": prompt,
+        "model": model,
+        "temperature": temperature,
+        "batch_size": times,
+        "results": results,
+    }
+    file_name = hashit(prompt + model + str(temperature))
     file_path = OUTPUTS_DIR.joinpath(f"{current_date}-{file_name}.json")
     file_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     return file_path
@@ -97,10 +105,11 @@ with st.form("generate_form"):
     prompt = st.text_area("Prompt", "Give me any book title (respond with just the name)")
     model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
     times = st.number_input("Times", min_value=1, max_value=100, value=50)
+    temperature = st.slider("Temperature", 0.0, 2.0, 1.0, 0.1)
     submitted = st.form_submit_button("Run batch")
     if submitted:
         with st.spinner("Generating..."):
-            file_path = asyncio.run(generate(prompt, model, times))
+            file_path = asyncio.run(generate(prompt, model, times, temperature))
         st.success(f"Results saved to {file_path}")
 
 
@@ -115,12 +124,13 @@ else:
             data = json.loads(f.read_text(encoding="utf-8"))
             run_date = data.get("date", "?")
             model = data.get("model", "?")
+            temperature = data.get("temperature", "?")
             batch_size = data.get("batch_size", "?")
             prompt_text = (data.get("prompt") or "").replace("\n", " ")
             prompt_preview = prompt_text[:60] + ("…" if len(prompt_text) > 60 else "")
 
             # compact, readable one-liner
-            label = f"{model} · {batch_size} · {prompt_preview}"
+            label = f"{model} · temp={temperature} · {batch_size} · {prompt_preview}"
         except Exception:
             label = f"{f.name} | <error reading>"
         file_labels.append(label)
@@ -139,6 +149,7 @@ else:
     # ---- Metadata ----
     prompt_text = data.get("prompt", None)
     model_used = data.get("model", None)
+    temperature_used = data.get("temperature", None)
     run_date = data.get("date", None)
     batch_size = data.get("batch_size", None)
 
@@ -159,6 +170,7 @@ else:
     st.markdown(f"**Date:** {run_date} ")
     st.markdown(
         f"**Model:** `{model_used}` {separator} "
+        f"**Temperature:** {temperature_used} {separator} "
         f"**Batch Size:** {batch_size} {separator} "
         f"**Display Top:** {top_n} {separator} "
         f"**Groups:** {group_count}"
