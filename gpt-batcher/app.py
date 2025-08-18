@@ -174,13 +174,13 @@ else:
     st.subheader("Batch Info")
     st.markdown(
         f"**Date:** {run_date} {separator} "
-        f"**Max Tokens:** {max_tokens_used} {separator} "
-        f"**Display Top:** {top_n}"
+        f"**Max Tokens:** {max_tokens_used}"
     )
     st.markdown(
         f"**Model:** `{model_used}` {separator} "
         f"**Temperature:** {temperature_used} {separator} "
         f"**Batch Size:** {batch_size} {separator} "
+        f"**Display Top:** {top_n} {separator} "
         f"**Groups:** {group_count}"
     )
     st.markdown(f"**Prompt:** {prompt_text}")
