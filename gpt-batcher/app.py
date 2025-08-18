@@ -20,17 +20,16 @@ client = AsyncOpenAI(api_key=api_key)
 OUTPUTS_DIR = Path("outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
-
 # -------- Core helpers --------
 def hashit(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
-
-async def run_once(prompt: str, model: str, temperature: float) -> str:
+async def run_once(prompt: str, model: str, temperature: float, max_output_tokens: int) -> str:
     response = await client.chat.completions.create(
         model=model,
         messages=[ChatCompletionUserMessageParam(content=prompt, role="user")],
         temperature=temperature,
+        max_tokens=max_output_tokens,
     )
 
     if (choices := response.choices) is None or len(choices) == 0:
@@ -41,9 +40,8 @@ async def run_once(prompt: str, model: str, temperature: float) -> str:
 
     return content
 
-
-async def generate(prompt: str, model: str, times: int, temperature: float):
-    tasks = [run_once(prompt, model, temperature) for _ in range(times)]
+async def generate(prompt: str, model: str, times: int, temperature: float, max_output_tokens: int):
+    tasks = [run_once(prompt, model, temperature, max_output_tokens) for _ in range(times)]
     results = await asyncio.gather(*tasks)
     current_date = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
     out = {
@@ -52,17 +50,16 @@ async def generate(prompt: str, model: str, times: int, temperature: float):
         "model": model,
         "temperature": temperature,
         "batch_size": times,
+        "max_output_tokens": max_output_tokens,
         "results": results,
     }
-    file_name = hashit(prompt + model + str(temperature))
+    file_name = hashit(prompt + model + str(temperature) + str(max_output_tokens))
     file_path = OUTPUTS_DIR.joinpath(f"{current_date}-{file_name}.json")
     file_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     return file_path
 
-
 def tokenize(text: str):
     return re.findall(r"\b\w+\b", text.lower())
-
 
 def word_counts(results, top_n: int = 20):
     words = []
@@ -71,19 +68,16 @@ def word_counts(results, top_n: int = 20):
     counts = Counter(words)
     return counts.most_common(top_n)
 
-
 def normalize_response(text: str) -> str:
     text = text.lower()
     text = re.sub(r"[^a-z0-9\s]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
-
 def response_counts(results, top_n: int = 20):
     normalized = [normalize_response(r) for r in results]
     counts = Counter(normalized)
     return counts.most_common(top_n)
-
 
 def plot_word_counts(word_freqs):
     if not word_freqs:
@@ -98,7 +92,6 @@ def plot_word_counts(word_freqs):
     ax.set_xticklabels(words, rotation=45, ha="right")
     st.pyplot(fig)
 
-
 # -------- Streamlit UI --------
 st.title("GPT Batch Generator + Visualizer")
 
@@ -106,14 +99,26 @@ st.header("Generate new batch")
 with st.form("generate_form"):
     prompt = st.text_area("Prompt", "Give me any book title (respond with just the name)")
     model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
-    times = st.number_input("Times", min_value=1, max_value=100, value=50)
-    temperature = st.slider("Temperature", 0.0, 2.0, 1.0, 0.1)
+    times = st.number_input("Times (how many times to run the prompt)", min_value=1, max_value=100, value=50)
+    temperature = st.slider("Temperature (randomness when picking a word from the rankings)", min_value=0.0, max_value=1.5, value=0.7, step=0.1)
+    max_output_tokens = st.number_input(
+        "Max output tokens (hard cap per response). This is to save you from unexpected costs.",
+        min_value=1,
+        max_value=100,
+        value=25,
+        step=1,
+        help="Upper bound for tokens the model may generate per response.",
+    )
+
+    # Budget guard readout
+    projected_max = times * max_output_tokens
+    st.caption(f"Projected worst-case output tokens this run: **{projected_max:,}**")
+
     submitted = st.form_submit_button("Run batch")
     if submitted:
         with st.spinner("Generating..."):
-            file_path = asyncio.run(generate(prompt, model, times, temperature))
+            file_path = asyncio.run(generate(prompt, model, times, temperature, int(max_output_tokens)))
         st.success(f"Results saved to {file_path}")
-
 
 st.header("Visualize existing batch")
 files = sorted(OUTPUTS_DIR.glob("*.json"), reverse=True)
@@ -125,14 +130,12 @@ else:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
             run_date = data.get("date", "?")
-            model = data.get("model", "?")
-            temperature = data.get("temperature", "?")
+            model_name = data.get("model", "?")
+            temperature_val = data.get("temperature", "?")
             batch_size = data.get("batch_size", "?")
             prompt_text = (data.get("prompt") or "").replace("\n", " ")
             prompt_preview = prompt_text[:60] + ("…" if len(prompt_text) > 60 else "")
-
-            # compact, readable one-liner
-            label = f"{model} · temp={temperature} · {batch_size} · {prompt_preview}"
+            label = f"{model_name} · temp={temperature_val} · {batch_size} · {prompt_preview}"
         except Exception:
             label = f"{f.name} | <error reading>"
         file_labels.append(label)
@@ -154,6 +157,7 @@ else:
     temperature_used = data.get("temperature", None)
     run_date = data.get("date", None)
     batch_size = data.get("batch_size", None)
+    max_tokens_used = data.get("max_output_tokens", None)
 
     # compute group count depending on grouping mode
     if grouping_mode == "Words":
@@ -174,6 +178,7 @@ else:
         f"**Model:** `{model_used}` {separator} "
         f"**Temperature:** {temperature_used} {separator} "
         f"**Batch Size:** {batch_size} {separator} "
+        f"**Max Tokens:** {max_tokens_used} {separator} "
         f"**Display Top:** {top_n} {separator} "
         f"**Groups:** {group_count}"
     )
