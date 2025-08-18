@@ -20,17 +20,39 @@ def hashit(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
 async def run_once(client: AsyncOpenAI, prompt: str, model: str, temperature: float, max_output_tokens: int) -> str:
+    # For gpt-5 models, we use a different token limit parameter. Thanks, OpenAI!
+    token_arg = (
+        {"max_completion_tokens": max_output_tokens}
+        if model.startswith("gpt-5")
+        else {"max_tokens": max_output_tokens}
+    )
+
+    # For gpt-5 models, we use minimal reasoning effort by default.
+    # For other models, the parameter is not applicable. Thanks, OpenAI!
+    reasoning_arg = (
+        {"reasoning_effort": "minimal"} if model.startswith("gpt-5") else {}
+    )
+
+    # GPT-5 allow ONLY 1.0 temperature, so we set it to 1.0 for those models. Thanks, OpenAI!
+    model_aware_temperature = 1.0 if model.startswith("gpt-5") else temperature
+
     response = await client.chat.completions.create(
         model=model,
         messages=[ChatCompletionUserMessageParam(content=prompt, role="user")],
-        temperature=temperature,
-        max_tokens=max_output_tokens,
+        temperature=model_aware_temperature,
+        **token_arg,
+        **reasoning_arg,
     )
+
+    # debug logging
+    st.write(f"Response: {response}")
 
     if (choices := response.choices) is None or len(choices) == 0:
         raise ValueError("No choices returned from OpenAI API")
+
     if (content := choices[0].message.content) is None:
         raise ValueError("No content in the first choice message")
+
     return content
 
 async def generate(client: AsyncOpenAI, prompt: str, model: str, times: int, temperature: float, max_output_tokens: int):
