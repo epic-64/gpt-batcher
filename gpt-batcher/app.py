@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import re
 from collections import Counter
 from datetime import datetime
@@ -9,6 +10,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import streamlit as st
 from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletionUserMessageParam
 
 st.sidebar.header("API Settings")
 api_key = st.sidebar.text_input("OpenAI API Key", type="password")
@@ -27,7 +29,7 @@ def hashit(s: str) -> str:
 async def run_once(prompt: str, model: str, temperature: float) -> str:
     response = await client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[ChatCompletionUserMessageParam(content=prompt, role="user")],
         temperature=temperature,
     )
 
