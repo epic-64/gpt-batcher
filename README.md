@@ -40,6 +40,12 @@ there is a whopping **92% chance** that it will return "The Great Gatsby". With 
 By using GPT Batcher, you can easily find out these probabilities for yourself. And hopefully get a
 feeling for what this means for self-expression.
 
+## Run it online
+You can access the app online at https://gpt-batcher.streamlit.app/
+Note: at the moment there is no authentication, so anyone will see your inputs and outputs.
+If you do not trust the application to handle your API key properly,
+you can clone the source code and run it locally instead.
+
 ## Build
 ### Clone and checkout the repository
 Clone the repo and checkout the master branch.
