@@ -44,9 +44,6 @@ async def run_once(client: AsyncOpenAI, prompt: str, model: str, temperature: fl
         **reasoning_arg,
     )
 
-    # debug logging
-    st.write(f"Response: {response}")
-
     if (choices := response.choices) is None or len(choices) == 0:
         raise ValueError("No choices returned from OpenAI API")
 
