@@ -111,7 +111,13 @@ st.header("Generate new batch")
 with st.form("generate_form"):
     api_key = st.text_input("OpenAI API Key", type="password")
     prompt = st.text_area("Prompt", "Give me any book title (respond with just the name)")
-    model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
+    model = st.selectbox("Model", [
+        "gpt-4o-mini",
+        "gpt-4o-2024-11-20",
+        "chatgpt-4o-latest",
+        "gpt-5-2025-08-07",
+        "gpt-3.5-turbo"
+    ])
     times = st.number_input("Times (how many times to run the prompt)", min_value=1, max_value=100, value=50)
     temperature = st.slider("Temperature (randomness when picking a word from the rankings)", min_value=0.0, max_value=1.5, value=0.7, step=0.1)
     max_output_tokens = st.number_input(
