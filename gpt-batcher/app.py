@@ -12,11 +12,6 @@ import streamlit as st
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionUserMessageParam
 
-st.sidebar.header("API Settings")
-api_key = st.sidebar.text_input("OpenAI API Key", type="password")
-
-client = AsyncOpenAI(api_key=api_key)
-
 OUTPUTS_DIR = Path("outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
@@ -24,7 +19,7 @@ OUTPUTS_DIR.mkdir(exist_ok=True)
 def hashit(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
-async def run_once(prompt: str, model: str, temperature: float, max_output_tokens: int) -> str:
+async def run_once(client: AsyncOpenAI, prompt: str, model: str, temperature: float, max_output_tokens: int) -> str:
     response = await client.chat.completions.create(
         model=model,
         messages=[ChatCompletionUserMessageParam(content=prompt, role="user")],
@@ -34,14 +29,12 @@ async def run_once(prompt: str, model: str, temperature: float, max_output_token
 
     if (choices := response.choices) is None or len(choices) == 0:
         raise ValueError("No choices returned from OpenAI API")
-
     if (content := choices[0].message.content) is None:
         raise ValueError("No content in the first choice message")
-
     return content
 
-async def generate(prompt: str, model: str, times: int, temperature: float, max_output_tokens: int):
-    tasks = [run_once(prompt, model, temperature, max_output_tokens) for _ in range(times)]
+async def generate(client: AsyncOpenAI, prompt: str, model: str, times: int, temperature: float, max_output_tokens: int):
+    tasks = [run_once(client, prompt, model, temperature, max_output_tokens) for _ in range(times)]
     results = await asyncio.gather(*tasks)
     current_date = datetime.today().strftime("%Y-%m-%d-%H-%M-%S")
     out = {
@@ -97,6 +90,7 @@ st.title("GPT Batch Generator + Visualizer")
 
 st.header("Generate new batch")
 with st.form("generate_form"):
+    api_key = st.text_input("OpenAI API Key", type="password")
     prompt = st.text_area("Prompt", "Give me any book title (respond with just the name)")
     model = st.selectbox("Model", ["gpt-4o-mini", "gpt-5-2025-08-07", "gpt-3.5-turbo"])
     times = st.number_input("Times (how many times to run the prompt)", min_value=1, max_value=100, value=50)
@@ -110,15 +104,20 @@ with st.form("generate_form"):
         help="Upper bound for tokens the model may generate per response.",
     )
 
-    # Budget guard readout
     projected_max = times * max_output_tokens
     st.caption(f"Projected worst-case output tokens this run: **{projected_max:,}**")
 
     submitted = st.form_submit_button("Run batch")
     if submitted:
-        with st.spinner("Generating..."):
-            file_path = asyncio.run(generate(prompt, model, times, temperature, int(max_output_tokens)))
-        st.success(f"Results saved to {file_path}")
+        if not api_key:
+            st.error("Please enter your OpenAI API Key before running the batch.")
+        else:
+            with st.spinner("Generating..."):
+                client = AsyncOpenAI(api_key=api_key)
+                file_path = asyncio.run(
+                    generate(client, prompt, model, int(times), float(temperature), int(max_output_tokens))
+                )
+            st.success(f"Results saved to {file_path}")
 
 st.header("Visualize existing batch")
 files = sorted(OUTPUTS_DIR.glob("*.json"), reverse=True)
@@ -173,13 +172,15 @@ else:
 
     separator = "&nbsp;&nbsp; | &nbsp;&nbsp;"
     st.subheader("Batch Info")
-    st.markdown(f"**Date:** {run_date} ")
+    st.markdown(
+        f"**Date:** {run_date} {separator} "
+        f"**Max Tokens:** {max_tokens_used} {separator} "
+        f"**Display Top:** {top_n}"
+    )
     st.markdown(
         f"**Model:** `{model_used}` {separator} "
         f"**Temperature:** {temperature_used} {separator} "
         f"**Batch Size:** {batch_size} {separator} "
-        f"**Max Tokens:** {max_tokens_used} {separator} "
-        f"**Display Top:** {top_n} {separator} "
         f"**Groups:** {group_count}"
     )
     st.markdown(f"**Prompt:** {prompt_text}")
@@ -197,6 +198,4 @@ else:
     if not results:
         st.write("No responses in this file.")
     else:
-        st.table({
-            "Content": results,
-        })
+        st.table({"Content": results})
